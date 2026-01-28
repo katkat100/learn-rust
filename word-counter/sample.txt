@@ -1,0 +1,13 @@
+The quick brown fox jumps over the lazy dog. This sentence contains every letter of the alphabet at least once.
+
+Rust is a systems programming language that runs blazingly fast, prevents segmentation faults, and guarantees thread safety. It accomplishes these goals without having a garbage collector, making it a useful language for a number of use cases other languages aren't good at.
+
+Word counting is a common task in text processing. This file contains multiple paragraphs with various words repeated throughout the text. By counting words, you can analyze the frequency of terms and understand the content better.
+
+Some words appear multiple times in this document. For example, the word "word" appears several times. The word "text" also appears multiple times. Can your program count how many times each word appears?
+
+Testing your word counter program requires having enough text to make the results interesting. This sample file provides that text. You can count total words, unique words, or even the frequency of specific words.
+
+Numbers like 123, 456, and 789 might be counted as words depending on how you implement your counter. Punctuation marks such as commas, periods, and exclamation points should typically be removed before counting.
+
+Happy coding with Rust!
