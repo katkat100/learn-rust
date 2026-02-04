@@ -260,13 +260,13 @@ A comprehensive guide for building a text-based adventure game in Rust as a lear
 - Test organization with `#[cfg(test)]`
 
 ### Success Criteria:
-- [ ] All item creation functions have tests
-- [ ] Room manipulation functions tested
-- [ ] Combat logic tested (damage, death, healing)
-- [ ] Inventory operations tested
-- [ ] Navigation and locked doors tested
-- [ ] `cargo test` passes with >80% coverage
-- [ ] Edge cases handled (empty inventory, dead monsters, etc.)
+- [x] All item creation functions have tests
+- [x] Room manipulation functions tested
+- [x] Combat logic tested (damage, death, healing)
+- [x] Inventory operations tested
+- [x] Navigation and locked doors tested
+- [x] `cargo test` passes with >80% coverage
+- [x] Edge cases handled (empty inventory, dead monsters, etc.)
 
 ---
 
@@ -292,17 +292,29 @@ A comprehensive guide for building a text-based adventure game in Rust as a lear
    - Show inventory count with colors
    - Display current room name prominently
 
+4. **Visited rooms map**
+   - Track which rooms the player has visited using a `HashSet<String>`
+   - Add a "map" command that displays visited rooms and connections
+   - Show the player's current room highlighted on the map
+   - Mark unvisited but known exits (rooms you haven't entered yet)
+   - Use colors to distinguish current room, visited rooms, and unexplored exits
+
 ### Key Rust Concepts:
 - External crate usage
 - String formatting with colors
 - ANSI color codes
+- HashSet for tracking visited state
+- Building text-based visual layouts from data structures
 
 ### Success Criteria:
-- [ ] `colored` crate added to project
-- [ ] Health displayed with color coding
-- [ ] Items colored by type
-- [ ] Combat messages more visually engaging
-- [ ] Room transitions clearly visible
+- [x] `colored` crate added to project
+- [x] Health displayed with color coding
+- [x] Items colored by type
+- [x] Combat messages more visually engaging
+- [x] Room transitions clearly visible
+- [x] "map" command shows visited rooms and connections
+- [x] Current room highlighted on map
+- [x] Unvisited exits shown as unexplored
 
 ---
 

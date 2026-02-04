@@ -1,4 +1,5 @@
 // items.rs - Module for handling all item-related logic
+use colored::Colorize;
 
 /// Defines the different types of items in the game
 /// Each variant can carry different data specific to that item type
@@ -23,6 +24,7 @@ pub enum ItemType {
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Item {
     pub name: String,
+    pub name_colored: String,
     pub description: String,
     pub item_type: ItemType,
 }
@@ -36,8 +38,16 @@ impl std::fmt::Display for Item {
 impl Item {
     /// Creates a new Item
     pub fn new(name: String, description: String, item_type: ItemType) -> Self {
+        let name_colored = match item_type {
+            ItemType::Key { unlocks: _ } | ItemType::Gold => format!("{}", name.bright_yellow().to_string()),
+            ItemType::Poison { damage: _ } => format!("{}", name.red().to_string()),
+            ItemType::Potion { healing: _ } => format!("{}", name.green().to_string()),
+            // ItemType::Junk => format!("{}", name.white()),
+            _ => format!("{} (Gold)", name),
+        };
         Item {
             name,
+            name_colored,
             description,
             item_type,
         }
@@ -45,7 +55,7 @@ impl Item {
 
     /// Returns a formatted string describing the item
     pub fn describe(&self) -> String {
-        format!("{}: {}", self.name, self.description)
+        format!("{}: {}", self.name_colored, self.description)
     }
 }
 
