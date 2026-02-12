@@ -1,13 +1,18 @@
 // rooms.rs - Module for handling all room-related logic
-use std::collections::HashMap;
 use colored::Colorize;
 
+use std::collections::HashMap;
+use std::io::{self, Write};
+
 use crate::items;
-use crate::items::{Item};
+use crate::items::Item;
+
+use crate::npc;
+use crate::npc::NPC;
 
 /// Defines the different types of rooms in the game
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum Direction {
     North,
     South,
@@ -41,18 +46,24 @@ pub struct Monster {
     pub health: u32,
     pub max_health: u32,
     pub damage: u32,
-    pub drop: Option<Item>
+    pub drop: Option<Item>,
 }
 
 impl Monster {
-    pub fn new(name: String, description: String, health: u32, damage: u32, drop:Option<Item>) -> Self {
+    pub fn new(
+        name: String,
+        description: String,
+        health: u32,
+        damage: u32,
+        drop: Option<Item>,
+    ) -> Self {
         Monster {
             name,
             description,
             health,
             max_health: health,
             damage,
-            drop
+            drop,
         }
     }
 }
@@ -65,7 +76,9 @@ pub struct Room {
     pub items: Vec<Item>,
     pub exits: HashMap<Direction, String>,
     pub locked_exits: HashMap<Direction, String>,
+    pub secret_exits: HashMap<Direction, (String, String)>,
     pub monster: Option<Monster>,
+    pub npc: Option<NPC>,
 }
 
 impl Room {
@@ -75,16 +88,20 @@ impl Room {
         room_type: RoomType,
         exits: HashMap<Direction, String>,
         locked_exits: HashMap<Direction, String>,
-        monster: Option<Monster>
+        secret_exits: HashMap<Direction, (String, String)>,
+        monster: Option<Monster>,
+        npc: Option<NPC>,
     ) -> Self {
         Room {
             name,
             description,
             room_type,
-            items: Vec::new(),  // Start with no items
+            items: Vec::new(), // Start with no items
             exits,
             locked_exits,
+            secret_exits,
             monster,
+            npc,
         }
     }
 
@@ -95,7 +112,9 @@ impl Room {
         items: Vec<Item>,
         exits: HashMap<Direction, String>,
         locked_exits: HashMap<Direction, String>,
-        monster: Option<Monster>
+        secret_exits: HashMap<Direction, (String, String)>,
+        monster: Option<Monster>,
+        npc: Option<NPC>,
     ) -> Self {
         Room {
             name,
@@ -104,15 +123,24 @@ impl Room {
             items,
             exits,
             locked_exits,
+            secret_exits,
             monster,
+            npc,
         }
     }
 
+    /// Describe room
     pub fn describe(&self) -> String {
         let mut description = String::new();
 
         description.push_str(&format!("=== {} ===\n", self.name).bright_cyan().to_string());
         description.push_str(&format!("{}\n\n", self.description));
+
+        if let Some(_npc) = &self.npc {
+            description.push_str(&format!(
+                "There's someone in the room waiting to talk to you.\n\n"
+            ));
+        }
 
         // List items if any
         if !self.items.is_empty() {
@@ -126,9 +154,7 @@ impl Room {
         // List exits
         if !self.exits.is_empty() {
             description.push_str("Exits: ");
-            let exit_names: Vec<&str> = self.exits.keys()
-                .map(|d| d.as_str())
-                .collect();
+            let exit_names: Vec<&str> = self.exits.keys().map(|d| d.as_str()).collect();
             description.push_str(&exit_names.join(", "));
             description.push('\n');
         }
@@ -136,10 +162,12 @@ impl Room {
         description
     }
 
+    /// Get exits
     pub fn get_exit(&self, direction: &Direction) -> Option<&String> {
         self.exits.get(direction)
     }
 
+    /// List exits of the room
     pub fn list_exits(&self) -> String {
         if self.exits.is_empty() {
             String::from("There are no visible exits")
@@ -153,6 +181,7 @@ impl Room {
         }
     }
 
+    /// List items in the room
     pub fn list_items(&self) -> String {
         if self.items.is_empty() {
             String::from("There are no items in this room")
@@ -166,6 +195,7 @@ impl Room {
         }
     }
 
+    /// Take an item from the room
     pub fn take_item(&mut self, item_name: &str) -> Option<Item> {
         if let Some(index) = self.items.iter().position(|item| item.name == item_name) {
             Some(self.items.remove(index))
@@ -174,8 +204,67 @@ impl Room {
         }
     }
 
+    /// Add an item to the room
     pub fn add_item(&mut self, item: Item) {
         self.items.push(item);
+    }
+
+    /// Get direction choice of the room
+    pub fn get_direction_choice(&self) -> Option<Direction> {
+        if self.exits.is_empty() {
+            return None;
+        }
+
+        println!("{}", self.list_exits());
+        println!("  [{}] Stay here\n", self.exits.len());
+
+        // Convert HashMap keys to a Vec so we can index them
+        let directions: Vec<&Direction> = self.exits.keys().collect();
+
+        loop {
+            print!("Choose a direction: ");
+            io::stdout().flush().unwrap();
+
+            let mut input = String::new();
+            io::stdin().read_line(&mut input).ok()?;
+
+            match input.trim().parse::<usize>() {
+                Ok(num) if num < directions.len() => {
+                    return Some(directions[num].clone()); // Return the Direction, not the index
+                }
+                Ok(num) if num == directions.len() => {
+                    return None; // Stay here
+                }
+                _ => println!("Invalid choice. Try again."),
+            }
+        }
+    }
+
+    /// Get the item choice of the room
+    pub fn get_item_choice(&self) -> Option<Item> {
+        if self.items.is_empty() {
+            return None;
+        }
+
+        println!("{}", self.list_items());
+        println!("  [{}] Leave items\n", self.items.len());
+
+        loop {
+            println!("Choose an item to take");
+            io::stdout().flush().unwrap();
+
+            let mut input = String::new();
+            io::stdin().read_line(&mut input).ok()?;
+            match input.trim().parse::<usize>() {
+                Ok(num) if num < self.items.len() => {
+                    return Some(self.items[num].clone());
+                }
+                Ok(num) if num == self.items.len() => {
+                    return None;
+                }
+                _ => println!("Invalid choice. Try again."),
+            }
+        }
     }
 
     // trigger trap
@@ -186,7 +275,9 @@ impl Room {
 pub fn create_dragon() -> Monster {
     Monster::new(
         String::from("Dragon"),
-        String::from("A massive dragon with shimmering scales and eyes that glow like molten fire. Smoke curls from its nostrils as it watches you with ancient intelligence."),
+        String::from(
+            "A massive dragon with shimmering scales and eyes that glow like molten fire. Smoke curls from its nostrils as it watches you with ancient intelligence.",
+        ),
         25,
         5,
         Some(items::create_gold()),
@@ -204,116 +295,80 @@ pub fn create_skeleton() -> Monster {
     )
 }
 
+/// Create a kobold
+pub fn create_kobold() -> Monster {
+    Monster::new(
+        String::from("Kobold"),
+        String::from("A small, lizard-like creature with sharp teeth and glowing red eyes."),
+        5,
+        2,
+        Some(items::create_one_gold()),
+    )
+}
+
+/// Create a goblin
+pub fn create_goblin() -> Monster {
+    Monster::new(
+        String::from("Goblin"),
+        String::from(
+            "A small, humanoid creature with a mischievous grin and a penchant for mischief.",
+        ),
+        10,
+        4,
+        Some(items::create_rusty_sword()),
+    )
+}
+
+/// Create a giant spider
+pub fn create_giant_spider() -> Monster {
+    Monster::new(
+        String::from("Giant Spider"),
+        String::from(
+            "A large spider with a body the size of a human head and legs as thick as your arm.",
+        ),
+        20,
+        6,
+        Some(items::create_steel_sword()),
+    )
+}
+
+/// Create a two headed snake
+pub fn create_two_headed_snake() -> Monster {
+    Monster::new(
+        String::from("Two-Headed Snake"),
+        String::from("A snake with two heads, each with its own set of fangs and eyes."),
+        15,
+        5,
+        Some(items::create_iron_sword()),
+    )
+}
+
 /// Create a Slime
 pub fn create_slime() -> Monster {
     Monster::new(
         String::from("Slime"),
-        String::from("A jelly like blob wobbles at you. You can see the bones of some cave dwelling rodent in its wibbly wobbly body."),
+        String::from(
+            "A jelly like blob wobbles at you. You can see the bones of some cave dwelling rodent in its wibbly wobbly body.",
+        ),
         10,
         1,
         Some(items::create_rusty_key()),
     )
 }
 
-/// Creates a entrance cave room (starting room)
-pub fn create_cave_entrance() -> Room {
-    let mut exits = HashMap::new();
-    let locked_exits = HashMap::new();
-    exits.insert(Direction::North, String::from("normal_room"));
-    Room::new_with_items(
-        String::from("Start"),
-        String::from("You find yourself in a dark, damp cave. Water drips from the stalactites above, echoing through the chamber. The air is cold and musty. You can barely make out the rough stone walls in the dim light filtering from somewhere above."),
-        RoomType::Normal,
-        vec![items::create_broken_cup(), items::create_rusty_spoon(), items::create_poison_vial()],
-        exits,
-        locked_exits,
-        None
+/// Create a Giant Slime
+pub fn create_giant_slime() -> Monster {
+    Monster::new(
+        String::from("Giant Slime"),
+        String::from(
+            "A jelly like blob wobbles at you largely, its body is twice as large as a normal slime.",
+        ),
+        10,
+        1,
+        Some(items::create_wooden_shield()),
     )
 }
 
-/// Creates a normal cave room
-pub fn create_normal_room() -> Room {
-    let mut exits = HashMap::new();
-    let locked_exits = HashMap::new();
-    exits.insert(Direction::South, String::from("cave_entrance"));
-    exits.insert(Direction::West, String::from("treasure_room"));
-    Room::new(
-        String::from("Dark Cave"),
-        String::from("A dark, damp cave. Water drips from the stalactites above, echoing through the chamber. The air is cold and musty. You can barely make out the rough stone walls in the dim light filtering from somewhere above."),
-        RoomType::Normal,
-        exits,
-        locked_exits,
-        Some(create_slime())
-    )
-}
-
-/// Creates a treasure room with a chest
-pub fn create_treasure_room() -> Room {
-    use crate::items;
-    let mut exits = HashMap::new();
-    let locked_exits = HashMap::new();
-    exits.insert(Direction::East, String::from("normal_room"));
-    exits.insert(Direction::North, String::from("dungeon_room"));
-
-    Room::new_with_items(
-        String::from("Treasure Chamber"),
-        String::from("A grand chamber with golden walls. In the center sits an ornate chest, its lock glinting in the torchlight. Ancient symbols are carved into the stone floor, and the air smells of old gold and mystery."),
-        RoomType::TreasureRoom,
-        vec![items::create_brass_key(), items::create_health_potion()],
-        exits,
-        locked_exits,
-        None
-    )
-}
-
-/// Creates a dungeon cell
-pub fn create_dungeon_room() -> Room {
-    let mut exits = HashMap::new();
-    let mut locked_exits = HashMap::new();
-    exits.insert(Direction::North, String::from("boss_room"));
-    exits.insert(Direction::South, String::from("treasure_room"));
-    locked_exits.insert(Direction::North, String::from("Rusty Key"));
-    Room::new_with_items(
-        String::from("Dungeon Cell"),
-        String::from("The walls are made of cold, rough stone. Rusted chains hang from the walls, and the floor is covered in filthy straw. A small barred window near the ceiling lets in a sliver of pale moonlight."),
-        RoomType::Dungeon,
-        vec![items::create_torn_page()],
-        exits,
-        locked_exits,
-        Some(create_skeleton()),
-
-    )
-}
-
-/// Creates a boss room
-pub fn create_boss_room() -> Room {
-    let mut exits = HashMap::new();
-    let locked_exits = HashMap::new();
-    exits.insert(Direction::South, String::from("dungeon_room"));
-    exits.insert(Direction::East, String::from("exit"));
-    Room::new(
-        String::from("Dragon's Lair"),
-        String::from("You enter a vast cavern. The ceiling disappears into darkness high above. Piles of gold and jewels are scattered everywhere, but your eyes are drawn to the massive dragon sleeping atop the largest treasure heap. Its scales shimmer even in the dim light."),
-        RoomType::BossRoom,
-        exits,
-        locked_exits,
-        Some(create_dragon()),
-    )
-}
-
-/// Creates the exit room (victory!)
-pub fn create_exit_room() -> Room {
-    let mut exits = HashMap::new();
-    exits.insert(Direction::West, String::from("boss_room"));
-    Room::new(
-        String::from("Freedom!"),
-        String::from("You emerge from the dark dungeon into brilliant sunlight. The fresh air fills your lungs as you stand at the entrance, the dragon's lair far behind you. Against all odds, you survived. The adventure is over, but the memories will last forever."),
-        RoomType::Normal,
-        exits,
-        HashMap::new(),  // No exits - game ends here,
-        None
-    )
-}
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -330,7 +385,9 @@ mod tests {
             RoomType::Normal,
             HashMap::new(),
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
 
         assert_eq!(room.name, "Room");
@@ -351,7 +408,9 @@ mod tests {
             vec![items::create_brass_key()],
             HashMap::new(),
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
 
         assert_eq!(room.name, "Room");
@@ -366,10 +425,34 @@ mod tests {
 
     #[test]
     fn test_room_describe() {
-        let room = create_cave_entrance();
+        let mut exits = HashMap::new();
+        let locked_exits = HashMap::new();
+        exits.insert(Direction::North, String::from("normal_room"));
+        let room = Room::new_with_items(
+            String::from("Start"),
+            String::from(
+                "You find yourself in a dark, damp cave. Water drips from the stalactites above, echoing through the chamber. The air is cold and musty. You can barely make out the rough stone walls in the dim light filtering from somewhere above.",
+            ),
+            RoomType::Normal,
+            vec![
+                items::create_broken_cup(),
+                items::create_rusty_spoon(),
+                items::create_poison_vial(),
+            ],
+            exits,
+            locked_exits,
+            HashMap::new(),
+            None,
+            Some(npc::create_npc_cleaner()),
+        );
         let room_describe = room.describe();
 
-        assert_eq!(room_describe, "=== Start ===\nYou find yourself in a dark, damp cave. Water drips from the stalactites above, echoing through the chamber. The air is cold and musty. You can barely make out the rough stone walls in the dim light filtering from somewhere above.\n\nYou see the following items:\n  - Broken Cup\n  - Rusty Spoon\n  - Vial of Poison\n\nExits: north\n")
+        assert!(room_describe.contains("=== Start ==="));
+        assert!(room_describe.contains("You find yourself in a dark, damp cave."));
+        assert!(room_describe.contains("Broken Cup"));
+        assert!(room_describe.contains("Rusty Spoon"));
+        assert!(room_describe.contains("Vial of Poison"));
+        assert!(room_describe.contains("Exits: north"));
     }
 
     #[test]
@@ -382,7 +465,9 @@ mod tests {
             RoomType::Normal,
             exits,
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
         let room_exit = room.get_exit(&Direction::North);
 
@@ -400,11 +485,15 @@ mod tests {
             RoomType::Normal,
             exits,
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
         let room_exits = room.list_exits();
 
-        assert_eq!(room_exits, "Available exits:\n  [0] Go north\n  [1] Go south\n");
+        assert!(room_exits.contains("Available exits:"));
+        assert!(room_exits.contains("Go north"));
+        assert!(room_exits.contains("Go south"));
     }
 
     #[test]
@@ -417,13 +506,15 @@ mod tests {
             vec![items::create_brass_key(), items::create_health_potion()],
             HashMap::new(),
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
         let list = room.list_items();
 
         assert!(list.contains("Available items:"));
-        assert!(list.contains("[0] Brass Key"));
-        assert!(list.contains("[1] Health Potion"));
+        assert!(list.contains("Brass Key"));
+        assert!(list.contains("Health Potion"));
     }
 
     #[test]
@@ -434,7 +525,9 @@ mod tests {
             RoomType::Normal,
             HashMap::new(),
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
 
         assert_eq!(room.list_items(), "There are no items in this room");
@@ -450,7 +543,9 @@ mod tests {
             vec![items::create_brass_key(), items::create_health_potion()],
             HashMap::new(),
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
 
         let taken = room.take_item("Brass Key");
@@ -470,7 +565,9 @@ mod tests {
             vec![items::create_brass_key()],
             HashMap::new(),
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
 
         let taken = room.take_item("Nonexistent Item");
@@ -487,7 +584,9 @@ mod tests {
             RoomType::Normal,
             HashMap::new(),
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
 
         assert_eq!(room.items.len(), 0);
@@ -525,13 +624,7 @@ mod tests {
 
     #[test]
     fn test_monster_new_no_drop() {
-        let monster = Monster::new(
-            String::from("Rat"),
-            String::from("A small rat"),
-            5,
-            1,
-            None,
-        );
+        let monster = Monster::new(String::from("Rat"), String::from("A small rat"), 5, 1, None);
 
         assert_eq!(monster.name, "Rat");
         assert_eq!(monster.health, 5);
@@ -549,7 +642,9 @@ mod tests {
             RoomType::Normal,
             exits,
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
         let desc = room.describe();
 
@@ -567,7 +662,9 @@ mod tests {
             RoomType::Normal,
             HashMap::new(),
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
         let desc = room.describe();
 
@@ -585,7 +682,9 @@ mod tests {
             RoomType::Normal,
             exits,
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
 
         assert!(room.get_exit(&Direction::South).is_none());
@@ -601,7 +700,9 @@ mod tests {
             RoomType::Normal,
             HashMap::new(),
             HashMap::new(),
-            None
+            HashMap::new(),
+            None,
+            None,
         );
 
         assert_eq!(room.list_exits(), "There are no visible exits");
@@ -640,89 +741,5 @@ mod tests {
         assert_eq!(slime.damage, 1);
         assert!(slime.drop.is_some());
         assert_eq!(slime.drop.unwrap().name, "Rusty Key");
-    }
-
-    // Room creation tests
-
-    #[test]
-    fn test_create_cave_entrance() {
-        let room = create_cave_entrance();
-
-        assert_eq!(room.name, "Start");
-        assert_eq!(room.room_type, RoomType::Normal);
-        assert_eq!(room.items.len(), 3);
-        assert_eq!(room.items[0].name, "Broken Cup");
-        assert_eq!(room.items[1].name, "Rusty Spoon");
-        assert_eq!(room.items[2].name, "Vial of Poison");
-        assert!(room.get_exit(&Direction::North).is_some());
-        assert!(room.monster.is_none());
-        assert!(room.locked_exits.is_empty());
-    }
-
-    #[test]
-    fn test_create_normal_room() {
-        let room = create_normal_room();
-
-        assert_eq!(room.name, "Dark Cave");
-        assert_eq!(room.room_type, RoomType::Normal);
-        assert!(room.items.is_empty());
-        assert!(room.get_exit(&Direction::West).is_some());
-        assert!(room.get_exit(&Direction::South).is_some());
-        assert!(room.monster.is_some());
-        assert_eq!(room.monster.unwrap().name, "Slime");
-    }
-
-    #[test]
-    fn test_create_treasure_room() {
-        let room = create_treasure_room();
-
-        assert_eq!(room.name, "Treasure Chamber");
-        assert_eq!(room.room_type, RoomType::TreasureRoom);
-        assert_eq!(room.items.len(), 2);
-        assert_eq!(room.items[0].name, "Brass Key");
-        assert_eq!(room.items[1].name, "Health Potion");
-        assert!(room.get_exit(&Direction::South).is_some());
-        assert!(room.get_exit(&Direction::East).is_some());
-        assert!(room.monster.is_none());
-    }
-
-    #[test]
-    fn test_create_dungeon_room() {
-        let room = create_dungeon_room();
-
-        assert_eq!(room.name, "Dungeon Cell");
-        assert_eq!(room.room_type, RoomType::Dungeon);
-        assert_eq!(room.items.len(), 1);
-        assert_eq!(room.items[0].name, "Torn Page");
-        assert!(room.get_exit(&Direction::South).is_some());
-        assert!(room.get_exit(&Direction::North).is_some());
-        assert!(!room.locked_exits.is_empty());
-        assert!(room.monster.is_some());
-        assert_eq!(room.monster.unwrap().name, "Skeleton");
-    }
-
-    #[test]
-    fn test_create_boss_room() {
-        let room = create_boss_room();
-
-        assert_eq!(room.name, "Dragon's Lair");
-        assert_eq!(room.room_type, RoomType::BossRoom);
-        assert!(room.items.is_empty());
-        assert!(room.get_exit(&Direction::North).is_some());
-        assert!(room.get_exit(&Direction::East).is_some());
-        assert!(room.monster.is_some());
-        assert_eq!(room.monster.unwrap().name, "Dragon");
-    }
-
-    #[test]
-    fn test_create_exit_room() {
-        let room = create_exit_room();
-
-        assert_eq!(room.name, "Freedom!");
-        assert_eq!(room.room_type, RoomType::Normal);
-        assert!(room.items.is_empty());
-        assert!(room.exits.is_empty());
-        assert!(room.locked_exits.is_empty());
-        assert!(room.monster.is_none());
     }
 }

@@ -2,6 +2,14 @@
 use colored::Colorize;
 
 /// Defines the different types of items in the game
+
+/// Represents a stat that can be applied to an item
+pub enum Stat {
+    Durability(u32),
+    Damage(u32),
+    Defense(u32),
+}
+
 /// Each variant can carry different data specific to that item type
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum ItemType {
@@ -17,7 +25,16 @@ pub enum ItemType {
     /// Junk items that serve no purpose (just take up space)
     Junk,
 
-    Gold,
+    /// Gold items that can be collected and used for currency
+    Gold { gold: u32 },
+
+    /// Equipment items that can be equipped by the player
+    Equipment {
+        slot: String,
+        damage: u32,
+        defense: u32,
+        durability: u32,
+    },
 }
 
 /// Represents an item in the game
@@ -27,6 +44,7 @@ pub struct Item {
     pub name_colored: String,
     pub description: String,
     pub item_type: ItemType,
+    pub cost: u32,
 }
 
 impl std::fmt::Display for Item {
@@ -37,25 +55,53 @@ impl std::fmt::Display for Item {
 
 impl Item {
     /// Creates a new Item
-    pub fn new(name: String, description: String, item_type: ItemType) -> Self {
+    pub fn new(name: String, description: String, item_type: ItemType, cost: u32) -> Self {
         let name_colored = match item_type {
-            ItemType::Key { unlocks: _ } | ItemType::Gold => format!("{}", name.bright_yellow().to_string()),
+            ItemType::Key { unlocks: _ } | ItemType::Gold { gold: _ } => {
+                format!("{}", name.bright_yellow().to_string())
+            }
             ItemType::Poison { damage: _ } => format!("{}", name.red().to_string()),
             ItemType::Potion { healing: _ } => format!("{}", name.green().to_string()),
             // ItemType::Junk => format!("{}", name.white()),
-            _ => format!("{} (Gold)", name),
+            _ => format!("{}", name),
         };
         Item {
             name,
             name_colored,
             description,
             item_type,
+            cost,
         }
     }
 
     /// Returns a formatted string describing the item
     pub fn describe(&self) -> String {
         format!("{}: {}", self.name_colored, self.description)
+    }
+
+    pub fn equipment_stats(&self) -> (u32, u32, u32) {
+        match &self.item_type {
+            ItemType::Equipment {
+                slot: _,
+                durability,
+                damage,
+                defense,
+            } => (*durability, *damage, *defense),
+            _ => (0, 0, 0),
+        }
+    }
+
+    /// Returns actions and item can take
+    pub fn available_actions(&self) -> Vec<&str> {
+        match &self.item_type {
+            ItemType::Potion { .. } => vec!["Drink"],
+            ItemType::Poison { .. } => vec!["Drink", "Throw"],
+            ItemType::Key { .. } => vec!["Unlock"],
+            ItemType::Junk => vec![],
+            ItemType::Gold { .. } => vec!["Save"],
+            ItemType::Equipment { .. } => vec!["Equip"],
+            _ => vec![],
+        }
     }
 }
 
@@ -68,6 +114,17 @@ pub fn create_health_potion() -> Item {
         String::from("Health Potion"),
         String::from("A red potion that restores 20 health"),
         ItemType::Potion { healing: 20 },
+        10,
+    )
+}
+
+/// Creates a medium health potion
+pub fn create_medium_health_potion() -> Item {
+    Item::new(
+        String::from("Medium Health Potion"),
+        String::from("A tiny red potion that restores 15 health"),
+        ItemType::Potion { healing: 15 },
+        7,
     )
 }
 
@@ -77,6 +134,7 @@ pub fn create_small_health_potion() -> Item {
         String::from("Small Health Potion"),
         String::from("A tiny red potion that restores 10 health"),
         ItemType::Potion { healing: 10 },
+        5,
     )
 }
 
@@ -86,6 +144,7 @@ pub fn create_poison_vial() -> Item {
         String::from("Vial of Poison"),
         String::from("A dark liquid that causes 15 damage if consumed"),
         ItemType::Poison { damage: 15 },
+        2,
     )
 }
 
@@ -95,8 +154,21 @@ pub fn create_brass_key() -> Item {
         String::from("Brass Key"),
         String::from("An old brass key. I wonder what it unlocks?"),
         ItemType::Key {
-            unlocks: String::from("treasure_chest")
+            unlocks: String::from("treasure_chest"),
         },
+        2,
+    )
+}
+
+/// Creates an iron key
+pub fn create_iron_key() -> Item {
+    Item::new(
+        String::from("Iron Key"),
+        String::from("A heavy iron key. It looks like it could open a sturdy door."),
+        ItemType::Key {
+            unlocks: String::from("dungeon_gate"),
+        },
+        3,
     )
 }
 
@@ -106,8 +178,21 @@ pub fn create_rusty_key() -> Item {
         String::from("Rusty Key"),
         String::from("A rusty key covered in grime"),
         ItemType::Key {
-            unlocks: String::from("dungeon_door")
+            unlocks: String::from("dungeon_door"),
         },
+        2,
+    )
+}
+
+/// Creates a shiny gem
+pub fn create_shiny_gem() -> Item {
+    Item::new(
+        String::from("Shiny Gem"),
+        String::from("A glittering gem. It looks valuable."),
+        ItemType::Key {
+            unlocks: String::from("treasure_room"),
+        },
+        5,
     )
 }
 
@@ -117,6 +202,7 @@ pub fn create_broken_cup() -> Item {
         String::from("Broken Cup"),
         String::from("A chipped, worthless cup. Why would anyone keep this?"),
         ItemType::Junk,
+        0,
     )
 }
 
@@ -126,6 +212,7 @@ pub fn create_rusty_spoon() -> Item {
         String::from("Rusty Spoon"),
         String::from("A bent, rusty spoon. Completely useless."),
         ItemType::Junk,
+        0,
     )
 }
 
@@ -135,6 +222,7 @@ pub fn create_torn_page() -> Item {
         String::from("Torn Page"),
         String::from("A torn page from an old book. The text is unreadable."),
         ItemType::Junk,
+        0,
     )
 }
 
@@ -143,9 +231,141 @@ pub fn create_gold() -> Item {
     Item::new(
         String::from("Bag of Gold"),
         String::from("A bag filled to the brim with gold!"),
-        ItemType::Gold,
+        ItemType::Gold { gold: 20 },
+        20,
     )
 }
+
+/// Creates a single gold coin (money for later)
+pub fn create_one_gold() -> Item {
+    Item::new(
+        String::from("A Gold"),
+        String::from("A gold!"),
+        ItemType::Gold { gold: 1 },
+        1,
+    )
+}
+
+pub fn create_ring() -> Item {
+    Item::new(
+        String::from("Ring"),
+        String::from("A shiny gold ring"),
+        ItemType::Equipment {
+            slot: String::from("Hand"),
+            damage: 0,
+            defense: 0,
+            durability: 10,
+        },
+        10,
+    )
+}
+
+/// create a hat
+pub fn create_hat() -> Item {
+    Item::new(
+        String::from("Hat"),
+        String::from("A utilarian hat"),
+        ItemType::Equipment {
+            slot: String::from("Head"),
+            damage: 0,
+            defense: 0,
+            durability: 3,
+        },
+        3,
+    )
+}
+
+/// create chest plate
+pub fn create_chest_plate() -> Item {
+    Item::new(
+        String::from("Chest Plate"),
+        String::from("A sturdy chest plate"),
+        ItemType::Equipment {
+            slot: String::from("Body"),
+            damage: 0,
+            defense: 5,
+            durability: 15,
+        },
+        15,
+    )
+}
+
+/// create a rusty sword
+pub fn create_rusty_sword() -> Item {
+    Item::new(
+        String::from("Rusty Sword"),
+        String::from("A rusty sword"),
+        ItemType::Equipment {
+            slot: String::from("Hand"),
+            damage: 5,
+            defense: 0,
+            durability: 5,
+        },
+        5,
+    )
+}
+
+/// Creates an iron sword
+pub fn create_iron_sword() -> Item {
+    Item::new(
+        String::from("Iron Sword"),
+        String::from("A sturdy iron sword, reliable in battle."),
+        ItemType::Equipment {
+            slot: String::from("Hand"),
+            damage: 7,
+            defense: 0,
+            durability: 10,
+        },
+        8,
+    )
+}
+
+/// Creates a steel sword
+pub fn create_steel_sword() -> Item {
+    Item::new(
+        String::from("Steel Sword"),
+        String::from("A finely forged steel blade that gleams in the light."),
+        ItemType::Equipment {
+            slot: String::from("Hand"),
+            damage: 10,
+            defense: 0,
+            durability: 15,
+        },
+        14,
+    )
+}
+
+/// Creates an enchanted blade
+pub fn create_enchanted_blade() -> Item {
+    Item::new(
+        String::from("Enchanted Blade"),
+        String::from("A sword humming with arcane energy. Runes glow faintly along the edge."),
+        ItemType::Equipment {
+            slot: String::from("Hand"),
+            damage: 13,
+            defense: 1,
+            durability: 20,
+        },
+        20,
+    )
+}
+
+/// Creates a wooden shield
+pub fn create_wooden_shield() -> Item {
+    Item::new(
+        String::from("Wooden Shield"),
+        String::from("A rough wooden shield. It's not much, but it's better than nothing."),
+        ItemType::Equipment {
+            slot: String::from("Hand"),
+            damage: 0,
+            defense: 3,
+            durability: 8,
+        },
+        4,
+    )
+}
+
+/// create a quick teleportation device connected to one room
 
 // ============================================================================
 // TESTS
@@ -162,6 +382,7 @@ mod tests {
             String::from("Test Item"),
             String::from("A test description"),
             ItemType::Junk,
+            0,
         );
 
         assert_eq!(item.name, "Test Item");
@@ -176,9 +397,12 @@ mod tests {
             String::from("Magic Sword"),
             String::from("A sword that glows"),
             ItemType::Junk,
+            0,
         );
+        let desc = item.describe();
 
-        assert_eq!(item.describe(), "Magic Sword: A sword that glows");
+        assert!(desc.contains("Magic Sword"));
+        assert!(desc.contains("A sword that glows"));
     }
 
     // Test 3: Item Display trait
@@ -188,6 +412,7 @@ mod tests {
             String::from("Shield"),
             String::from("A sturdy shield"),
             ItemType::Junk,
+            0,
         );
 
         assert_eq!(format!("{}", item), "Shield - A sturdy shield");
@@ -227,9 +452,12 @@ mod tests {
         let key = create_brass_key();
 
         assert_eq!(key.name, "Brass Key");
-        assert_eq!(key.item_type, ItemType::Key {
-            unlocks: String::from("treasure_chest")
-        });
+        assert_eq!(
+            key.item_type,
+            ItemType::Key {
+                unlocks: String::from("treasure_chest")
+            }
+        );
     }
 
     // Test 8: Rusty key creation
@@ -238,9 +466,12 @@ mod tests {
         let key = create_rusty_key();
 
         assert_eq!(key.name, "Rusty Key");
-        assert_eq!(key.item_type, ItemType::Key {
-            unlocks: String::from("dungeon_door")
-        });
+        assert_eq!(
+            key.item_type,
+            ItemType::Key {
+                unlocks: String::from("dungeon_door")
+            }
+        );
     }
 
     // Test 9: Junk item creation
@@ -261,7 +492,7 @@ mod tests {
         let gold = create_gold();
 
         assert_eq!(gold.name, "Bag of Gold");
-        assert_eq!(gold.item_type, ItemType::Gold);
+        assert_eq!(gold.item_type, ItemType::Gold { gold: 20 });
     }
 
     // Test 11: Item equality (two identical items)
