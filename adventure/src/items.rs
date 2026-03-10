@@ -3,11 +3,10 @@ use colored::Colorize;
 
 /// Defines the different types of items in the game
 
-/// Represents a stat that can be applied to an item
-pub enum Stat {
-    Durability(u32),
-    Damage(u32),
-    Defense(u32),
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum BuffType {
+    Damage,
+    Defense,
 }
 
 /// Each variant can carry different data specific to that item type
@@ -34,6 +33,15 @@ pub enum ItemType {
         damage: u32,
         defense: u32,
         durability: u32,
+    },
+
+    /// Food items can be consumed to keep back hunger
+    Food { hunger_restore: u32 },
+
+    Buff {
+        buff_type: BuffType,
+        value: u32,
+        turns_remaining: u32,
     },
 }
 
@@ -94,12 +102,13 @@ impl Item {
     /// Returns actions and item can take
     pub fn available_actions(&self) -> Vec<&str> {
         match &self.item_type {
-            ItemType::Potion { .. } => vec!["Drink"],
+            ItemType::Potion { .. } | ItemType::Buff { .. } => vec!["Drink"],
             ItemType::Poison { .. } => vec!["Drink", "Throw"],
             ItemType::Key { .. } => vec!["Unlock"],
             ItemType::Junk => vec![],
             ItemType::Gold { .. } => vec!["Save"],
             ItemType::Equipment { .. } => vec!["Equip"],
+            ItemType::Food { .. } => vec!["Eat"],
             _ => vec![],
         }
     }
@@ -145,6 +154,73 @@ pub fn create_poison_vial() -> Item {
         String::from("A dark liquid that causes 15 damage if consumed"),
         ItemType::Poison { damage: 15 },
         2,
+    )
+}
+
+/// Creates a buff potion
+pub fn create_buff_potion() -> Item {
+    Item::new(
+        String::from("Buff Potion"),
+        String::from("A potion that grants a temporary buff to strength"),
+        ItemType::Buff {
+            buff_type: BuffType::Damage,
+            value: 5,
+            turns_remaining: 3,
+        },
+        3,
+    )
+}
+
+pub fn create_tough_potion() -> Item {
+    Item::new(
+        String::from("Tough Potion"),
+        String::from("A potion that grants a temporary buff to defense"),
+        ItemType::Buff {
+            buff_type: BuffType::Defense,
+            value: 5,
+            turns_remaining: 3,
+        },
+        3,
+    )
+}
+
+/// Creates an apple
+pub fn create_apple() -> Item {
+    Item::new(
+        String::from("Apple"),
+        String::from("A juicy apple"),
+        ItemType::Food { hunger_restore: 3 },
+        1,
+    )
+}
+
+/// Creates bread
+pub fn create_bread() -> Item {
+    Item::new(
+        String::from("Bread"),
+        String::from("A loaf of bread"),
+        ItemType::Food { hunger_restore: 5 },
+        2,
+    )
+}
+
+/// Creates hard cheese
+pub fn create_hard_cheese() -> Item {
+    Item::new(
+        String::from("Hard Cheese"),
+        String::from("A hard cheese"),
+        ItemType::Food { hunger_restore: 4 },
+        3,
+    )
+}
+
+/// Creates jerky
+pub fn create_jerky() -> Item {
+    Item::new(
+        String::from("Jerky"),
+        String::from("A piece of jerky"),
+        ItemType::Food { hunger_restore: 6 },
+        4,
     )
 }
 

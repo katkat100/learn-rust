@@ -1,8 +1,8 @@
 use colored::Colorize;
 
-use crate::items;
 use crate::items::{Item, ItemType};
 use crate::rooms::{Room, RoomType};
+use crate::{items, player};
 
 #[derive(Debug, Clone)]
 pub struct EquippedItems {
@@ -13,16 +13,29 @@ pub struct EquippedItems {
     pub feet: Option<Item>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HungerState {
+    Satiated, //0
+    Grumbly,  //50
+    Hungry,   //75
+    Ravenous, //90
+    Starving, //100
+}
+
 #[derive(Debug, Clone)]
 pub struct Player {
     pub name: String,
     pub health: u32,
     pub max_health: u32,
+    pub hunger: u32,
+    pub max_hunger: u32,
+    hunger_state: HungerState,
     pub damage: u32,
     pub defense: u32,
     pub inventory: Vec<Item>,
     pub gold: u32,
     pub equipped: EquippedItems,
+    pub buffs: Vec<Item>,
 }
 
 impl Player {
@@ -30,22 +43,51 @@ impl Player {
     pub fn new(
         name: String,
         health: u32,
+        max_hunger: u32,
         damage: u32,
         defense: u32,
         inventory: Vec<Item>,
         gold: u32,
         equipped: EquippedItems,
+        buffs: Vec<Item>,
     ) -> Self {
         Player {
             name,
             health,
             max_health: health,
+            hunger: 0,
+            hunger_state: HungerState::Satiated,
+            max_hunger,
             damage,
             defense,
             inventory,
             gold,
             equipped,
+            buffs,
         }
+    }
+
+    pub fn on_move(&mut self) {
+        self.hunger = (self.hunger + 1).min(self.max_hunger);
+        if self.hunger >= self.max_hunger {
+            self.health = self.health.saturating_sub(1);
+            println!("You're starving! You lost 1 health.");
+            self.hunger_state = HungerState::Starving;
+        } else if self.hunger >= self.max_hunger * 9 / 10
+            && self.hunger_state != HungerState::Ravenous
+        {
+            println!("You're ravenous! Find food before you start starving.");
+            self.hunger_state = HungerState::Ravenous;
+        } else if self.hunger >= self.max_hunger * 3 / 4 && self.hunger_state != HungerState::Hungry
+        {
+            println!("Your stomach growls loudly. You need food soon.");
+            self.hunger_state = HungerState::Hungry;
+        } else if self.hunger >= self.max_hunger / 2 && self.hunger_state != HungerState::Grumbly {
+            println!("You're starting to feel hungry.");
+            self.hunger_state = HungerState::Grumbly;
+        }
+
+        self.tick_buffs();
     }
 
     /// Use an item from the inventory
@@ -136,6 +178,30 @@ impl Player {
                     return (false, Some(line));
                 }
             }
+            ItemType::Buff { .. } => {
+                let line = format!("You drink the {} and feel a surge of power!", item.name);
+                self.buffs.push(item);
+                (false, Some(line))
+            }
+            ItemType::Food { hunger_restore } => {
+                self.hunger = self.hunger.saturating_sub(hunger_restore);
+                let line = format!(
+                    "You eat the {} and your hunger decreases by {}.",
+                    item.name, hunger_restore
+                );
+                if (self.hunger >= self.max_hunger) {
+                    self.hunger_state = HungerState::Starving;
+                } else if self.hunger >= self.max_hunger * 9 / 10 {
+                    self.hunger_state = HungerState::Ravenous;
+                } else if self.hunger >= self.max_hunger * 3 / 4 {
+                    self.hunger_state = HungerState::Hungry;
+                } else if self.hunger >= self.max_hunger / 2 {
+                    self.hunger_state = HungerState::Grumbly;
+                } else {
+                    self.hunger_state = HungerState::Satiated;
+                }
+                (true, Some(line))
+            }
         }
     }
 
@@ -206,6 +272,26 @@ impl Player {
                 .feet
                 .as_ref()
                 .map_or(0, |i| i.equipment_stats().1)
+            + self
+                .buffs
+                .iter()
+                .filter(|b| {
+                    matches!(
+                        b.item_type,
+                        ItemType::Buff {
+                            buff_type: items::BuffType::Damage,
+                            ..
+                        }
+                    )
+                })
+                .map(|b| {
+                    if let ItemType::Buff { value, .. } = &b.item_type {
+                        *value
+                    } else {
+                        0
+                    }
+                })
+                .sum::<u32>()
     }
 
     /// player base defense + equipped items defense
@@ -236,6 +322,26 @@ impl Player {
                 .feet
                 .as_ref()
                 .map_or(0, |i| i.equipment_stats().2)
+            + self
+                .buffs
+                .iter()
+                .filter(|b| {
+                    matches!(
+                        b.item_type,
+                        ItemType::Buff {
+                            buff_type: items::BuffType::Defense,
+                            ..
+                        }
+                    )
+                })
+                .map(|b| {
+                    if let ItemType::Buff { value, .. } = &b.item_type {
+                        *value
+                    } else {
+                        0
+                    }
+                })
+                .sum::<u32>()
     }
 
     pub fn wear_damage_equipment(&mut self) {
@@ -346,6 +452,27 @@ impl Player {
             text.red()
         }
     }
+
+    pub fn tick_buffs(&mut self) {
+        for buff in &mut self.buffs {
+            if let ItemType::Buff {
+                turns_remaining, ..
+            } = &mut buff.item_type
+            {
+                *turns_remaining = turns_remaining.saturating_sub(1);
+            }
+        }
+        self.buffs.retain(|b| {
+            if let ItemType::Buff {
+                turns_remaining, ..
+            } = &b.item_type
+            {
+                *turns_remaining > 0
+            } else {
+                true
+            }
+        });
+    }
 }
 
 fn tick(slot: &mut Option<Item>) {
@@ -358,26 +485,6 @@ fn tick(slot: &mut Option<Item>) {
             }
         }
     }
-}
-
-pub fn create_player(
-    name: &str,
-    health: u32,
-    damage: u32,
-    defense: u32,
-    inventory: Vec<Item>,
-    gold: u32,
-    equipped: EquippedItems,
-) -> Player {
-    Player::new(
-        name.to_string(),
-        health,
-        damage,
-        defense,
-        inventory,
-        gold,
-        equipped,
-    )
 }
 
 // ============================================================================
@@ -394,6 +501,9 @@ mod tests {
             name: String::from("Test Player"),
             health: 20,
             max_health: 20,
+            hunger: 20,
+            max_hunger: 20,
+            hunger_state: HungerState::Satiated,
             damage: 5,
             defense: 0,
             inventory: Vec::new(),
@@ -405,6 +515,7 @@ mod tests {
                 right_hand: None,
                 feet: None,
             },
+            buffs: Vec::new(),
         }
     }
 
@@ -509,7 +620,7 @@ mod tests {
 
         let (consumed, _) = player.use_item(&mut room, gold);
 
-        assert!(!consumed);
+        assert!(consumed);
         assert_eq!(player.health, 20); // Health unchanged
     }
 

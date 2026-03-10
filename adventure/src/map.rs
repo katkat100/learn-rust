@@ -4,6 +4,45 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::rooms::{Direction, Room};
 
+const CELL_WIDTH: usize = 10;
+
+/// Pad or truncate a string to exactly CELL_WIDTH characters, centered.
+fn pad_name(name: &str) -> String {
+    if name.len() >= CELL_WIDTH {
+        name[..CELL_WIDTH].to_string()
+    } else {
+        let total_pad = CELL_WIDTH - name.len();
+        let left = total_pad / 2;
+        let right = total_pad - left;
+        format!("{}{}{}", " ".repeat(left), name, " ".repeat(right))
+    }
+}
+
+/// Pad a colored string to CELL_WIDTH by adding spaces around it.
+/// Colored strings have hidden ANSI codes, so we pad based on the original text length.
+fn pad_colored(name: &str, colored: colored::ColoredString) -> String {
+    let total_pad = CELL_WIDTH.saturating_sub(name.len());
+    let left = total_pad / 2;
+    let right = total_pad - left;
+    format!("{}{}{}", " ".repeat(left), colored, " ".repeat(right))
+}
+
+fn empty_cell() -> String {
+    " ".repeat(CELL_WIDTH)
+}
+
+fn connector_vertical() -> String {
+    let left = CELL_WIDTH / 2;
+    let right = CELL_WIDTH - left - 1;
+    format!("{}|{}", " ".repeat(left), " ".repeat(right))
+}
+
+fn connector_horizontal() -> String {
+    let dashes = 4;
+    let pad = (CELL_WIDTH - dashes) / 2;
+    format!("{}{}{}", " ".repeat(pad), "-".repeat(dashes), " ".repeat(CELL_WIDTH - pad - dashes))
+}
+
 pub fn display_map(
     world_map: &HashMap<String, Room>,
     visited_rooms: &HashSet<String>,
@@ -52,17 +91,17 @@ pub fn display_map(
 
     // Build render grid
     let mut grid =
-        vec![vec![String::from("     "); (width * 2 + 1) as usize]; (height * 2 + 1) as usize];
-    for (id, (x, y)) in normalized_positions {
-        let room = world_map.get(&id).unwrap();
+        vec![vec![empty_cell(); (width * 2 + 1) as usize]; (height * 2 + 1) as usize];
+    for (id, (x, y)) in &normalized_positions {
+        let room = world_map.get(id).unwrap();
 
         // add room to grid
-        if current_room_id == &id {
-            grid[y as usize * 2][x as usize * 2] = format!("{}", room.name.magenta());
-        } else if visited_rooms.contains(&id) {
-            grid[y as usize * 2][x as usize * 2] = format!("{}", room.name);
+        if current_room_id == id {
+            grid[*y as usize * 2][*x as usize * 2] = pad_colored(&room.name, room.name.magenta());
+        } else if visited_rooms.contains(id) {
+            grid[*y as usize * 2][*x as usize * 2] = pad_name(&room.name);
         } else {
-            grid[y as usize * 2][x as usize * 2] = format!(" ??? ",);
+            grid[*y as usize * 2][*x as usize * 2] = pad_name("???");
         }
 
         // add room exits to grid
@@ -77,10 +116,8 @@ pub fn display_map(
             };
             if cx >= 0 && cy >= 0 && (cy as usize) < grid.len() && (cx as usize) < grid[0].len() {
                 grid[cy as usize][cx as usize] = match direction {
-                    Direction::North => format!("  |  "),
-                    Direction::South => format!("  |  "),
-                    Direction::East => format!("-----"),
-                    Direction::West => format!("-----"),
+                    Direction::North | Direction::South => connector_vertical(),
+                    Direction::East | Direction::West => connector_horizontal(),
                 };
             }
         }

@@ -17,7 +17,7 @@ use player::Player;
 mod map;
 use map::display_map;
 
-const ACTIONS_STR: &str = "(look/move/take/inventory/map/help/quit)";
+const ACTIONS_STR: &str = "(look/move/take/inventory/stats/talk/map/help/quit)";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "Welcome to the adventure!".bright_yellow());
@@ -26,12 +26,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut name_str = String::new();
     io::stdin().read_line(&mut name_str)?;
 
-    let mut player = player::create_player(
-        name_str.trim(),
+    let mut player = Player::new(
+        String::from(name_str.trim()),
+        20,
         20,
         5,
         0,
-        Vec::new(),
+        vec![items::create_apple()],
         0,
         player::EquippedItems {
             head: None,
@@ -40,6 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             right_hand: None,
             feet: None,
         },
+        Vec::new(),
     );
 
     println!("\nHello {}!", player.name);
@@ -89,10 +91,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     exits.insert(Direction::East, String::from("cave_entrance"));
     world_map.insert(
         String::from("norm_g8"),
-        Room::new(
+        Room::new_with_items(
             String::from("Slime Tunnel"),
             String::from("A narrow tunnel coated in a thin layer of translucent goo. The walls glisten in the dim light, and the air carries a faintly sweet, rotten smell."),
             RoomType::Normal,
+            vec![items::create_small_health_potion()],
             exits,
             HashMap::new(),
             HashMap::new(),
@@ -107,10 +110,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     exits.insert(Direction::East, String::from("norm_g8"));
     world_map.insert(
         String::from("norm_f8"),
-        Room::new(
+        Room::new_with_items(
             String::from("Kobold Den"),
             String::from("Crude scratches cover the walls like tally marks. Small bones and scraps of leather litter the ground. Something has been living here."),
             RoomType::Normal,
+            vec![items::create_rusty_sword()],
             exits,
             HashMap::new(),
             HashMap::new(),
@@ -125,10 +129,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     exits.insert(Direction::East, String::from("norm_f8"));
     world_map.insert(
         String::from("norm_e8"),
-        Room::new(
+        Room::new_with_items(
             String::from("Bone Corridor"),
             String::from("Fragments of old armor and scattered bones crunch underfoot. The remains of past adventurers line the walls like a grim warning."),
             RoomType::Normal,
+            vec![items::create_wooden_shield()],
             exits,
             HashMap::new(),
             HashMap::new(),
@@ -145,10 +150,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     exits.insert(Direction::South, String::from("norm_e8"));
     world_map.insert(
         String::from("norm_e7"),
-        Room::new(
+        Room::new_with_items(
             String::from("Dripping Passage"),
             String::from("Water trickles steadily down the walls, pooling in shallow puddles on the uneven stone floor. The constant dripping echoes through the narrow passage."),
             RoomType::Normal,
+            vec![items::create_bread()],
             exits,
             HashMap::new(),
             HashMap::new(),
@@ -163,10 +169,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     exits.insert(Direction::South, String::from("cave_entrance"));
     world_map.insert(
         String::from("norm_h7"),
-        Room::new(
+        Room::new_with_items(
             String::from("Goblin's Crossing"),
             String::from("Crude drawings of stick figures and arrows are smeared across the walls in what looks like charcoal. A foul stench hangs in the air, and a half-eaten rat sits on a flat rock."),
             RoomType::Normal,
+            vec![items::create_one_gold(), items::create_jerky()],
             exits,
             HashMap::new(),
             HashMap::new(),
@@ -200,7 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         String::from("Dungeon Cell"),
         String::from("The walls are made of cold, rough stone. Rusted chains hang from the walls, and the floor is covered in filthy straw. A small barred window near the ceiling lets in a sliver of pale moonlight."),
         RoomType::Dungeon,
-        vec![items::create_chest_plate()],
+        vec![items::create_chest_plate(), items::create_tough_potion()],
         exits,
         HashMap::new(),
         HashMap::new(),
@@ -216,10 +223,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     locked_exits.insert(Direction::West, String::from("Iron Key"));
     world_map.insert(
         String::from("norm_d6"),
-        Room::new(
+        Room::new_with_items(
             String::from("Locked Chamber"),
             String::from("A heavy iron door dominates the western wall, its surface pitted with rust and age. Deep gouges in the stone floor suggest something was once dragged through here."),
             RoomType::Normal,
+            vec![items::create_iron_sword(), items::create_medium_health_potion()],
             exits,
             locked_exits,
             HashMap::new(),
@@ -271,10 +279,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     exits.insert(Direction::South, String::from("norm_h7"));
     world_map.insert(
         String::from("norm_h6"),
-        Room::new(
+        Room::new_with_items(
             String::from("Crumbling Hallway"),
             String::from("The ceiling sags dangerously low in places and loose stones litter the path. A worn trail in the dust leads north toward what looks like iron bars."),
             RoomType::Normal,
+            vec![items::create_hard_cheese()],
             exits,
             HashMap::new(),
             HashMap::new(),
@@ -348,10 +357,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     world_map.insert(
         String::from("norm_j5"),
-        Room::new(
+        Room::new_with_items(
             String::from("Whispering Chamber"),
             String::from("The walls seem to hum with a faint vibration. A cool breeze drifts from somewhere to the south, carrying with it the faintest glimmer of light."),
             RoomType::Normal,
+            vec![items::create_buff_potion()],
             exits,
             locked_exits,
             secret_exits,
@@ -423,6 +433,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         // --- SECRET ROOMS ---
 
+        // ---MONSTER FIGHTS ---
         let monster_info = world_map
             .get(&current_room_id)
             .and_then(|room| room.monster.as_ref())
@@ -499,6 +510,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 return Ok(());
                             }
                         }
+                        player.tick_buffs();
                     }
                 }
                 Ok(1) => {
@@ -614,6 +626,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "take" => {
                 handle_take(parts, &mut world_map, &mut current_room_id, &mut player);
             }
+            "stats" => {
+                handle_stats(&player);
+            }
             "inventory" | "inv" | "i" => {
                 handle_inv(&mut player, &mut world_map, &mut current_room_id);
             }
@@ -714,6 +729,8 @@ fn handle_move(
                 return false;
             }
 
+            player.on_move();
+
             println!("{}", world_map[current_room_id].describe());
         } else {
             println!("You can't go that way!");
@@ -771,6 +788,57 @@ fn handle_examine(
         }
         true;
     }
+}
+
+fn handle_stats(player: &Player) -> bool {
+    println!(
+        "\n{}\n",
+        String::from("PLAYER STATS").bold().bright_purple()
+    );
+
+    // name
+    println!("Name: {}", player.name);
+    // health
+    println!("Health: {}/{}", player.color_health(), player.max_health);
+    // hunger
+    println!("Hunger: {}/{}", player.hunger, player.max_hunger);
+    // strength
+    println!("Strength: {}", player.total_damage());
+    // defense
+    println!("Defense: {}", player.total_defense());
+    // equipment
+    let mut equippment = String::new();
+
+    if let Some(item) = player.get_equipped_slot("Head") {
+        if let ItemType::Equipment { durability, .. } = &item.item_type {
+            equippment += &format!("\nHead: {} (durability: {})", item.name, durability);
+        }
+    }
+    if let Some(item) = player.get_equipped_slot("Body") {
+        if let ItemType::Equipment { durability, .. } = &item.item_type {
+            equippment += &format!("\nBody: {} (durability: {})", item.name, durability);
+        }
+    }
+    if let Some(item) = player.get_equipped_slot("Feet") {
+        if let ItemType::Equipment { durability, .. } = &item.item_type {
+            equippment += &format!("\nFeet: {} (durability: {})", item.name, durability);
+        }
+    }
+    let (left, right) = player.get_equipped_hands();
+    if let Some(item) = left {
+        if let ItemType::Equipment { durability, .. } = &item.item_type {
+            equippment += &format!("\nLeft Hand: {} (durability: {})", item.name, durability);
+        }
+    }
+
+    if let Some(item) = right {
+        if let ItemType::Equipment { durability, .. } = &item.item_type {
+            equippment += &format!("\nRight Hand: {} (durability: {})", item.name, durability);
+        }
+    }
+
+    println!("{}", equippment);
+    true
 }
 
 fn handle_talk(
@@ -852,7 +920,7 @@ fn handle_talk(
                         }
                     }
                     "Buy" => {
-                        let mut shop_items = &mut npc.items;
+                        let shop_items = &mut npc.items;
                         if shop_items.iter().len() == 0 {
                             println!("{}: \"I'm sorry, but I'm out of stock.\"", npc.name.green());
                             return true;
@@ -913,7 +981,7 @@ fn handle_talk(
                             println!("{}: \"You don't have anything to sell!\"", npc.name.green());
                         } else {
                             loop {
-                                let mut player_items: Vec<Item> = player
+                                let player_items: Vec<Item> = player
                                     .inventory
                                     .iter()
                                     .filter(|item| item.item_type != ItemType::Junk)
@@ -1191,7 +1259,7 @@ fn handle_inv(
 
                     match inv_input.trim().parse::<usize>() {
                         Ok(inv_num) if inv_num < actions.len() => match actions[inv_num] {
-                            "Drink" | "Unlock" | "Save" | "Equip" => {
+                            "Drink" | "Unlock" | "Save" | "Equip" | "Eat" => {
                                 let item = player.inventory[num].clone();
                                 if let Some(room) = world_map.get_mut(current_room_id) {
                                     let (item_used, line) = player.use_item(room, item.clone());

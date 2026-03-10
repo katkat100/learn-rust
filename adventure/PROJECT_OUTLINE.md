@@ -375,7 +375,7 @@ A comprehensive guide for building a text-based adventure game in Rust as a lear
 
 3. **More Rooms**
    - Expand to 15+ rooms
-   - Add different biomes (forest, swamp, castle, etc.)
+   <!--- Add different biomes (forest, swamp, castle, etc.)-->
    - Secret rooms with valuable loot
    - Puzzle rooms requiring items to solve
 
@@ -385,13 +385,34 @@ A comprehensive guide for building a text-based adventure game in Rust as a lear
    - "equip" and "unequip" commands
    - Show equipped items in status
 
+5. **Player Stats Command**
+   - Add a "stats" command that shows player health, damage, and defense
+   - Display each equipment slot (head, body, left hand, right hand, feet) and what's equipped
+   - Show equipment durability so the player can see how their gear is faring
+   - Show total damage and defense bonuses from equipment
+
+6. **Hunger Warning Messages**
+   - Add warnings at different hunger thresholds so the player knows they need food
+   - ~50%: "You're starting to feel hungry."
+   - ~75%: "Your stomach growls loudly. You need food soon."
+   - ~90%: "You're ravenous! Find food before you start starving."
+   - Only show each message once (not every move at that threshold)
+
+7. **Fix Map Display Alignment**
+   - Room names have different lengths which breaks the grid layout
+   - Pad or truncate room names to a fixed column width so the map stays aligned
+   - Ensure connectors (| and -----) line up correctly regardless of name length
+   - Consider abbreviating long names or centering short names within the cell
+
 ### Success Criteria:
-- [ ] 10+ new items added
-- [ ] 8+ new monsters added
-- [ ] World expanded to 15+ rooms
-- [ ] Equipment system functional
-- [ ] Loot drops from monsters
-- [ ] Secret areas discoverable
+- [x] 10+ new items added
+- [x] 8+ new monsters added
+- [x] World expanded to 15+ rooms
+- [x] Equipment system functional
+- [x] Loot drops from monsters
+- [x] Secret areas discoverable
+- [x] "stats" command shows player stats and equipped items with durability
+- [x] Map displays correctly with rooms of varying name lengths
 
 ---
 

@@ -284,6 +284,19 @@ pub fn create_dragon() -> Monster {
     )
 }
 
+/// Create an Ogre
+pub fn create_ogre() -> Monster {
+    Monster::new(
+        String::from("Ogre"),
+        String::from(
+            "A massive ogre with a thick beard and a belly that could hold a small village.",
+        ),
+        30,
+        7,
+        Some(items::create_gold()),
+    )
+}
+
 /// Create Skeleton
 pub fn create_skeleton() -> Monster {
     Monster::new(
@@ -291,6 +304,19 @@ pub fn create_skeleton() -> Monster {
         String::from("A skeleton with a few knicks and dings to his bones."),
         15,
         3,
+        Some(items::create_small_health_potion()),
+    )
+}
+
+/// Create Three Small Skeletons in a Trench Coat
+pub fn create_three_skeletons_trench_coat() -> Monster {
+    Monster::new(
+        String::from("Three Small Skeletons in a Trench Coat"),
+        String::from(
+            "A weirdly disproportionatly tall skeleton that looks like he's wearing a trench coat.",
+        ),
+        25,
+        5,
         Some(items::create_small_health_potion()),
     )
 }
